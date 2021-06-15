@@ -8,18 +8,22 @@ const database = require('../database')
 const { User } = require('../models/user.models.js')
 const {Video} = require('../models/video.models.js')
 
+const {checkSignature} = require('../middlewares')
+
+router.use(checkSignature)
+
+
 // @route saved operations
-router.get("/:token",async (req,res)=>{
-  const {token} = req.params
+router.get("/",async (req,res)=>{
+  const {userId} = req.body
   const videos = await Video.find({})
-  const { saved } = await User.findOne({token:token})
+  const { saved } = await User.findById(userId)
 
   const newSaved = saved.map(video =>{ 
     let {title,description,channelImage,videoUrl,id} = videos.find((item) => item._id.toString() === video._id.toString())
   return {title,description,channelImage,videoUrl,id,_id:video._id,notes:video.notes}
     }
   )
-
     res.json({
         status:200,
         saved:{
@@ -28,35 +32,29 @@ router.get("/:token",async (req,res)=>{
 },
     })
 }) 
-router.post("/add/:token",async (req,res)=>{
-  const { token } = req.params
-  const {_id,notes} = req.body
-  const user = await User.findOne({token:token})
+router.post("/add",async (req,res)=>{
+  const {_id,notes,userId} = req.body
+  const user = await User.findById(userId)
   let saved = user.saved !== undefined ? user.saved : []
     if(saved.find(video=> video._id === _id) !== undefined){
-      console.log("logged")
       saved = saved.map(video => video._id.toString() === _id ?   {...video,notes:notes}: video)
     }
     else{
       saved = [...saved,{_id,notes}]
     }
-  const Saved = await User.findOneAndUpdate({token:token},{saved:saved})
-
+    await User.findOneAndUpdate({_id:userId},{saved:saved})
     res.json({
         status:200,
         comment:`Video ID:${_id} saved`
     })
 })
-router.post("/remove/:token",async (req,res)=>{
-    const { token } = req.params
-    const { _id } = req.body
+router.post("/remove",async (req,res)=>{
+    const { _id,userId } = req.body
 
-    const {saved} = await User.findOne({token:token})
-    console.log(saved)
-
+    const {saved} = await User.findById(userId)
     const newSaved = saved.filter(video=> video._id.toString() !== _id)
 
-    await User.findOneAndUpdate({token:token},{saved:newSaved})
+    await User.findOneAndUpdate({_id:userId},{saved:newSaved})
 
     res.json({
         status:200,

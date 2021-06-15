@@ -1,5 +1,7 @@
 const express = require('express')
 const router = express.Router()
+const {logger} = require('../utils') 
+const {checkSignature} = require('../middlewares')
 
 const database = require('../database')
 let { videoList, playlists, liked, saved, users } = database
@@ -8,11 +10,13 @@ const { Video } = require('../models/video.models.js')
 const {User} = require('../models/user.models.js')
 
 
+router.use(checkSignature)
+
 // @route liked operations
-router.get("/:token", async (req, res) => {
-  const { token } = req.params
+router.get("/",async (req, res) => {
+  const { userId } = req.body
   try{
-  const { likedvideos } = await User.findOne({token:token})
+  const { likedvideos } = await User.findById(userId)
   const videos = await Video.find({})
   let liked = []
   likedvideos.forEach((id)=>videos.find((video)=>(video._id).toString() === (id).toString()) ? liked = [...liked,videos.find((video)=>(video._id).toString() === (id).toString())] : null)
@@ -32,34 +36,33 @@ router.get("/:token", async (req, res) => {
   
 })
 
-router.post("/add/:token", async (req, res) => {
-  const {_id} = req.body
-  const { token } = req.params
+router.post("/add", async (req, res) => {
+  const {_id,userId} = req.body
   try{
-      const { likedvideos } = await User.findOne({token:token})
+      const { likedvideos } = await User.findById(userId)
       if(!likedvideos.find(id => (id).toString() === (_id).toString())){
-       await User.findOneAndUpdate({token:token},{likedvideos:[...likedvideos,_id]}) 
+       await User.findOneAndUpdate({_id:userId},{likedvideos:[...likedvideos,_id]}) 
       }
       res.json({
       status: 200,
-      comment: `Video ID: ${req.body.id} liked`
+      comment: `Video ID: ${req.body._id} liked`
     })
   }catch(e){
-    console.log(e)
+    logger(e)
     res.status(404).json({
       error:e.message
     })
   }
-  
 })
-router.delete("/remove/:token", async (req, res) => {
-  const { token } = req.params
-  const { _id } = req.body.video
-  try{
 
-    const { likedvideos } = await User.findOne({token:token})
+// Have to start from here
+router.delete("/remove", async (req, res) => {
+  const { _id } = req.body.video
+  const {userId} = req.body
+  try{
+    const { likedvideos } = await User.findById(userId)
     const newList = likedvideos.filter(id => (id).toString() !== (_id).toString())
-    const updateVideo = await User.findOneAndUpdate({token:token},{likedvideos:newList})
+    const updateVideo = await User.findOneAndUpdate({_id:userId},{likedvideos:newList})
     
     res.json({
       status: 302,
